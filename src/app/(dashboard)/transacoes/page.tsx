@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Trash2, Search, CreditCard } from 'lucide-react'
+import { Plus, Trash2, Search, Pencil } from 'lucide-react'
 import { format, parseISO, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { v4 as uuidv4 } from 'uuid'
@@ -64,11 +64,35 @@ export default function TransacoesPage() {
   const { user } = useAuth()
   const { transactions, creditCards, loading } = useFinanceData(user)
   const [open, setOpen] = useState(false)
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all')
   const [filterCategory, setFilterCategory] = useState<string>('all')
+
+  const openNew = () => {
+    setEditingTx(null)
+    setForm(emptyForm)
+    setOpen(true)
+  }
+
+  const openEdit = (tx: Transaction) => {
+    setEditingTx(tx)
+    setForm({
+      description: tx.description,
+      amount: tx.amount.toString(),
+      type: tx.type,
+      category: tx.category,
+      date: tx.date,
+      paymentMethod: tx.paymentMethod || 'debit',
+      creditCardId: tx.creditCardId || '',
+      local: tx.local || '',
+      notes: tx.notes || '',
+      installmentTotal: '',
+    })
+    setOpen(true)
+  }
 
   const handleSave = async () => {
     if (!user || !form.description || !form.amount) {
@@ -84,46 +108,78 @@ export default function TransacoesPage() {
     setSaving(true)
     try {
       const amount = parseFloat(form.amount.replace(',', '.'))
-      const installments = parseInt(form.installmentTotal) || 1
 
-      for (let i = 0; i < installments; i++) {
-        const date = new Date(form.date)
-        date.setMonth(date.getMonth() + i)
-
-        const billingMonth = form.paymentMethod === 'credit_card'
-          ? format(addMonths(new Date(form.date), i + 1), 'yyyy-MM')
-          : undefined
-
-        const tx: Transaction = {
-          id: uuidv4(),
-          description: installments > 1
-            ? `${form.description} (${i + 1}/${installments})`
-            : form.description,
-          amount: amount / installments,
+      if (editingTx) {
+        const updated = {
+          ...editingTx,
+          description: form.description,
+          amount,
           type: form.type,
           category: form.category,
-          date: format(date, 'yyyy-MM-dd'),
+          date: form.date,
           paymentMethod: form.paymentMethod,
-          creditCardId: form.paymentMethod === 'credit_card' ? form.creditCardId : undefined,
-          billingMonth,
-          local: form.local || undefined,
-          notes: form.notes || undefined,
-          installmentTotal: installments > 1 ? installments : undefined,
-          installmentCurrent: installments > 1 ? i + 1 : undefined,
-          createdAt: new Date().toISOString(),
+          ...(form.paymentMethod === 'credit_card' && form.creditCardId
+            ? { creditCardId: form.creditCardId }
+            : {}),
+          ...(form.paymentMethod === 'credit_card'
+            ? { billingMonth: format(addMonths(new Date(form.date), 1), 'yyyy-MM') }
+            : {}),
+          ...(form.local ? { local: form.local } : {}),
+          ...(form.notes ? { notes: form.notes } : {}),
         }
 
-        await saveTransaction(user.uid, tx)
+        // Remove campos undefined antes de salvar
+        const clean = Object.fromEntries(
+          Object.entries(updated).filter(([, v]) => v !== undefined)
+        ) as unknown as Transaction
+
+        await saveTransaction(user.uid, clean)
+        toast.success('Transação atualizada!')
+      } else {
+        const installments = parseInt(form.installmentTotal) || 1
+        for (let i = 0; i < installments; i++) {
+          const date = new Date(form.date)
+          date.setMonth(date.getMonth() + i)
+
+          const tx: Transaction = {
+            id: uuidv4(),
+            description: installments > 1
+              ? `${form.description} (${i + 1}/${installments})`
+              : form.description,
+            amount: amount / installments,
+            type: form.type,
+            category: form.category,
+            date: format(date, 'yyyy-MM-dd'),
+            paymentMethod: form.paymentMethod,
+            ...(form.paymentMethod === 'credit_card' && form.creditCardId
+              ? { creditCardId: form.creditCardId }
+              : {}),
+            ...(form.paymentMethod === 'credit_card'
+              ? { billingMonth: format(addMonths(new Date(form.date), i + 1), 'yyyy-MM') }
+              : {}),
+            ...(form.local ? { local: form.local } : {}),
+            ...(form.notes ? { notes: form.notes } : {}),
+            ...(installments > 1
+              ? { installmentTotal: installments, installmentCurrent: i + 1 }
+              : {}),
+            createdAt: new Date().toISOString(),
+          }
+
+          await saveTransaction(user.uid, tx)
+        }
+
+        toast.success(
+          parseInt(form.installmentTotal) > 1
+            ? `${form.installmentTotal} parcelas lançadas!`
+            : 'Transação salva!'
+        )
       }
 
-      toast.success(
-        installments > 1
-          ? `${installments} parcelas lançadas!`
-          : 'Transação salva!'
-      )
       setForm(emptyForm)
+      setEditingTx(null)
       setOpen(false)
-    } catch {
+    } catch (err) {
+      console.error('Erro ao salvar:', err)
       toast.error('Erro ao salvar transação')
     } finally {
       setSaving(false)
@@ -180,19 +236,18 @@ export default function TransacoesPage() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingTx(null) }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={openNew}>
               <Plus className="w-4 h-4 mr-2" />
               Nova Transação
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Nova Transação</DialogTitle>
+              <DialogTitle>{editingTx ? 'Editar Transação' : 'Nova Transação'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              {/* Tipo */}
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant={form.type === 'expense' ? 'destructive' : 'outline'}
@@ -209,7 +264,6 @@ export default function TransacoesPage() {
                 </Button>
               </div>
 
-              {/* Descrição */}
               <div className="space-y-2">
                 <Label>Descrição</Label>
                 <Input
@@ -219,7 +273,6 @@ export default function TransacoesPage() {
                 />
               </div>
 
-              {/* Valor e Data */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Valor (R$)</Label>
@@ -239,16 +292,13 @@ export default function TransacoesPage() {
                 </div>
               </div>
 
-              {/* Categoria */}
               <div className="space-y-2">
                 <Label>Categoria</Label>
                 <Select
                   value={form.category}
                   onValueChange={(v) => setForm({ ...form, category: v as TransactionCategory })}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CATEGORIES.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -257,7 +307,6 @@ export default function TransacoesPage() {
                 </Select>
               </div>
 
-              {/* Método de pagamento */}
               {form.type === 'expense' && (
                 <div className="space-y-2">
                   <Label>Forma de pagamento</Label>
@@ -265,9 +314,7 @@ export default function TransacoesPage() {
                     value={form.paymentMethod}
                     onValueChange={(v) => setForm({ ...form, paymentMethod: v as PaymentMethod, creditCardId: '' })}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {PAYMENT_METHODS.map((m) => (
                         <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
@@ -277,7 +324,6 @@ export default function TransacoesPage() {
                 </div>
               )}
 
-              {/* Cartão de crédito */}
               {form.type === 'expense' && form.paymentMethod === 'credit_card' && (
                 <div className="space-y-2">
                   <Label>Cartão</Label>
@@ -290,17 +336,12 @@ export default function TransacoesPage() {
                       value={form.creditCardId}
                       onValueChange={(v) => setForm({ ...form, creditCardId: v })}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o cartão" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Selecione o cartão" /></SelectTrigger>
                       <SelectContent>
                         {creditCards.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: c.color }}
-                              />
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }} />
                               {c.name}
                             </div>
                           </SelectItem>
@@ -311,7 +352,6 @@ export default function TransacoesPage() {
                 </div>
               )}
 
-              {/* Local */}
               <div className="space-y-2">
                 <Label>Local (opcional)</Label>
                 <Input
@@ -321,8 +361,7 @@ export default function TransacoesPage() {
                 />
               </div>
 
-              {/* Parcelas */}
-              {form.type === 'expense' && (
+              {!editingTx && form.type === 'expense' && (
                 <div className="space-y-2">
                   <Label>Parcelas (opcional)</Label>
                   <Input
@@ -336,7 +375,6 @@ export default function TransacoesPage() {
                 </div>
               )}
 
-              {/* Observações */}
               <div className="space-y-2">
                 <Label>Observações (opcional)</Label>
                 <Input
@@ -347,14 +385,13 @@ export default function TransacoesPage() {
               </div>
 
               <Button className="w-full" onClick={handleSave} disabled={saving}>
-                {saving ? 'Salvando...' : 'Salvar Transação'}
+                {saving ? 'Salvando...' : editingTx ? 'Salvar alterações' : 'Salvar Transação'}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -366,9 +403,7 @@ export default function TransacoesPage() {
           />
         </div>
         <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="income">Receitas</SelectItem>
@@ -376,9 +411,7 @@ export default function TransacoesPage() {
           </SelectContent>
         </Select>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Categoria" />
-          </SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
             {CATEGORIES.map((c) => (
@@ -388,7 +421,6 @@ export default function TransacoesPage() {
         </Select>
       </div>
 
-      {/* Lista */}
       <Card>
         <CardContent className="p-0">
           {filtered.length === 0 ? (
@@ -412,36 +444,34 @@ export default function TransacoesPage() {
                           <span className="text-xs text-muted-foreground">
                             {format(parseISO(t.date), 'dd/MM/yyyy')}
                           </span>
-                          <Badge variant="outline" className="text-xs py-0">
-                            {t.category}
-                          </Badge>
+                          <Badge variant="outline" className="text-xs py-0">{t.category}</Badge>
                           <Badge variant="outline" className="text-xs py-0">
                             {getPaymentLabel(t.paymentMethod || 'debit')}
                           </Badge>
                           {card && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs py-0 flex items-center gap-1"
-                            >
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: card.color }}
-                              />
+                            <Badge variant="outline" className="text-xs py-0 flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: card.color }} />
                               {card.name}
                             </Badge>
                           )}
                           {t.local && (
-                            <span className="text-xs text-muted-foreground">
-                              📍 {t.local}
-                            </span>
+                            <span className="text-xs text-muted-foreground">📍 {t.local}</span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className={`font-semibold ${t.type === 'income' ? 'text-emerald-500' : 'text-red-500'}`}>
                         {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-8 h-8 text-muted-foreground hover:text-blue-500"
+                        onClick={() => openEdit(t)}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
