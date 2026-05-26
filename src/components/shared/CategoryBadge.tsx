@@ -15,15 +15,17 @@ const CATEGORY_COLORS: Record<TransactionCategory, string> = {
 }
 
 interface CategoryBadgeProps {
-  category: TransactionCategory
+  category: string
   className?: string
 }
 
 export function CategoryBadge({ category, className }: CategoryBadgeProps) {
+  const colorClass = CATEGORY_COLORS[category as TransactionCategory] || 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+
   return (
     <Badge
       variant="outline"
-      className={`text-xs py-0 ${CATEGORY_COLORS[category] || ''} ${className || ''}`}
+      className={`text-xs py-0 ${colorClass} ${className || ''}`}
     >
       {category}
     </Badge>

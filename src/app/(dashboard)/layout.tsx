@@ -30,6 +30,7 @@ import {
   Landmark,
   RefreshCw,
   PieChart,
+  Settings,
   Sun,
   Moon,
   Eye,
@@ -46,6 +47,7 @@ const navItems = [
   { href: '/patrimonio', label: 'Patrimônio', icon: Landmark },
   { href: '/orcamentos', label: 'Orçamentos', icon: PieChart },
   { href: '/julius', label: 'Julius', icon: MessageCircle },
+  { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
 function AppSidebar() {
