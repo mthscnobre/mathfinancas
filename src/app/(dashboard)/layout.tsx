@@ -1,9 +1,23 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut } from '@/lib/auth'
+import { useTheme } from 'next-themes'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -14,9 +28,10 @@ import {
   LogOut,
   TrendingUp,
   Landmark,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -28,6 +43,85 @@ const navItems = [
   { href: '/julius', label: 'Julius', icon: MessageCircle },
 ]
 
+function AppSidebar() {
+  const pathname = usePathname()
+  const router = useRouter()
+  const { user } = useAuth()
+  const { theme, setTheme } = useTheme()
+
+  const handleSignOut = async () => {
+    await signOut()
+    toast.success('Até logo!')
+    router.push('/login')
+  }
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <div className="flex items-center gap-2 cursor-default">
+                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
+                  <TrendingUp className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <span className="font-bold text-lg">MathFinanças</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+                      <Link href={item.href}>
+                        <Icon className="w-4 h-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+              <span>{theme === 'dark' ? 'Modo claro' : 'Modo escuro'}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Sair" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4" />
+              <span className="text-muted-foreground">{user?.email}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  )
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -35,19 +129,12 @@ export default function DashboardLayout({
 }) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const pathname = usePathname()
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login')
     }
   }, [user, loading, router])
-
-  const handleSignOut = async () => {
-    await signOut()
-    toast.success('Até logo!')
-    router.push('/login')
-  }
 
   if (loading) {
     return (
@@ -60,60 +147,14 @@ export default function DashboardLayout({
   if (!user) return null
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-64 border-r bg-card flex flex-col">
-        <div className="p-6 border-b">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
-              <TrendingUp className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg">MathFinanças</span>
-          </div>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
-            return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {item.label}
-                </div>
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="p-4 border-t">
-          <div className="text-xs text-muted-foreground mb-3 truncate">
-            {user.email}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground"
-            onClick={handleSignOut}
-          >
-            <LogOut className="w-4 h-4" />
-            Sair
-          </Button>
-        </div>
-      </aside>
-
-      {/* Main content */}
+    <SidebarProvider>
+      <AppSidebar />
       <main className="flex-1 overflow-auto">
+        <div className="flex items-center gap-2 p-4 border-b">
+          <SidebarTrigger />
+        </div>
         {children}
       </main>
-    </div>
+    </SidebarProvider>
   )
 }
