@@ -15,9 +15,14 @@ export async function addMemory(messages: { role: 'user' | 'assistant'; content:
 
 export async function searchMemories(query: string): Promise<string> {
   try {
-    const response = await client.search(query, { user_id: USER_ID } as Parameters<typeof client.search>[1])
+    const response = await client.search(query, {
+      user_id: USER_ID,
+      limit: 10,
+    } as Parameters<typeof client.search>[1])
 
-    const results = Array.isArray(response) ? response : (response as { results: { memory: string }[] }).results
+    const results = Array.isArray(response)
+      ? response
+      : (response as { results: { memory: string }[] }).results
 
     if (!results || results.length === 0) return ''
 
