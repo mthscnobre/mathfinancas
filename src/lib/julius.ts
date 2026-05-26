@@ -75,7 +75,8 @@ ${recentTransactions || 'Nenhuma transação registrada'}
 export async function askJulius(
   userMessage: string,
   summary: FinancialSummary,
-  conversationHistory: { role: 'user' | 'assistant'; content: string }[]
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+  memories: string = ''
 ): Promise<string> {
   const financialContext = buildFinancialContext(summary)
 
@@ -97,13 +98,13 @@ export async function askJulius(
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000',
     },
-    body: JSON.stringify({
-      model: 'deepseek/deepseek-v4-flash',
-      messages: [
-        {
-          role: 'system',
-          content: `${JULIUS_SYSTEM_PROMPT}\n\nDADOS FINANCEIROS DO USUÁRIO:\n${financialContext}`,
-        },
+body: JSON.stringify({
+  model: 'deepseek/deepseek-v4-flash',
+  messages: [
+    {
+      role: 'system',
+      content: `${JULIUS_SYSTEM_PROMPT}\n\nDADOS FINANCEIROS DO USUÁRIO:\n${financialContext}${memories}`,
+    },
         ...messages,
       ],
       max_tokens: 1024,
