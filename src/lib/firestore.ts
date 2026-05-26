@@ -7,6 +7,7 @@ import {
   query,
   orderBy,
   getDocs,
+  limit,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { Transaction, Goal, Recurrence, UserSettings, CreditCard, Piggybank, Investment } from '@/types'
@@ -181,4 +182,34 @@ export const getLastReport = async (userId: string): Promise<string | null> => {
 export const saveReport = async (userId: string, report: { content: string; createdAt: string }) => {
   const id = report.createdAt.substring(0, 7) // YYYY-MM
   await setDoc(doc(db, 'users', userId, 'julius_reports', id), report)
+}
+
+// ===== JULIUS HISTORY =====
+export const saveJuliusMessage = async (
+  userId: string,
+  message: { role: 'user' | 'assistant'; content: string; timestamp: string }
+) => {
+  const id = `${message.timestamp}-${Math.random().toString(36).slice(2)}`
+  await setDoc(doc(db, 'users', userId, 'julius_history', id), message)
+}
+
+export const getJuliusHistory = async (
+  userId: string,
+  limitCount: number = 20
+): Promise<{ role: 'user' | 'assistant'; content: string; timestamp: string }[]> => {
+  const q = query(
+    collection(db, 'users', userId, 'julius_history'),
+    orderBy('timestamp', 'desc'),
+    limit(limitCount)
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map((d) => d.data() as { role: 'user' | 'assistant'; content: string; timestamp: string })
+    .reverse()
+}
+
+export const clearJuliusHistory = async (userId: string) => {
+  const snap = await getDocs(collection(db, 'users', userId, 'julius_history'))
+  const batch = snap.docs.map((d) => deleteDoc(d.ref))
+  await Promise.all(batch)
 }

@@ -4,14 +4,20 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { JuliusMessage } from '@/types'
-import { getLastReport, saveReport } from '@/lib/firestore'
+import {
+  getLastReport,
+  saveReport,
+  saveJuliusMessage,
+  getJuliusHistory,
+  clearJuliusHistory,
+} from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { Send, Loader2, RefreshCw } from 'lucide-react'
+import { Send, Loader2, RefreshCw, History } from 'lucide-react'
 import { format, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -31,6 +37,7 @@ export default function JuliusPage() {
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [loadingReport, setLoadingReport] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const reportGenerated = useRef(false)
@@ -41,9 +48,27 @@ export default function JuliusPage() {
     }
   }, [messages])
 
+  // Carrega histórico ao abrir
+  useEffect(() => {
+    if (!user) return
+
+    const loadHistory = async () => {
+      try {
+        const history = await getJuliusHistory(user.uid, 30)
+        setMessages(history)
+      } catch {
+        // histórico vazio ou erro — não faz nada
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+
+    loadHistory()
+  }, [user])
+
   // Relatório automático no primeiro dia do mês
   useEffect(() => {
-    if (!user || loading || reportGenerated.current) return
+    if (!user || loading || loadingHistory || reportGenerated.current) return
 
     const checkAndGenerateReport = async () => {
       const today = new Date()
@@ -52,29 +77,22 @@ export default function JuliusPage() {
 
       const lastReport = await getLastReport(user.uid)
       const currentMonth = format(today, 'yyyy-MM')
-
       if (lastReport && lastReport.startsWith(currentMonth)) return
 
       reportGenerated.current = true
       setLoadingReport(true)
 
       const lastMonthLabel = format(subMonths(today, 1), "MMMM 'de' yyyy", { locale: ptBR })
-
       const autoMessage = `Gere um relatório completo do mês de ${lastMonthLabel}. Analise receitas, despesas, categorias principais, comparação com médias históricas, pontos de atenção e recomendações para este novo mês. Use sua personalidade característica.`
 
       try {
         const response = await fetch('/api/julius', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: autoMessage,
-            summary,
-            history: [],
-          }),
+          body: JSON.stringify({ message: autoMessage, summary, history: [] }),
         })
 
         if (!response.ok) throw new Error()
-
         const data = await response.json()
 
         const reportMsg: JuliusMessage = {
@@ -83,8 +101,8 @@ export default function JuliusPage() {
           timestamp: new Date().toISOString(),
         }
 
-        setMessages([reportMsg])
-
+        setMessages((prev) => [...prev, reportMsg])
+        await saveJuliusMessage(user.uid, reportMsg)
         await saveReport(user.uid, {
           content: data.response,
           createdAt: new Date().toISOString(),
@@ -97,7 +115,7 @@ export default function JuliusPage() {
     }
 
     checkAndGenerateReport()
-  }, [user, loading, summary])
+  }, [user, loading, loadingHistory, summary])
 
   const sendMessage = async (text?: string) => {
     const message = text || input.trim()
@@ -113,6 +131,8 @@ export default function JuliusPage() {
     setInput('')
     setThinking(true)
 
+    if (user) await saveJuliusMessage(user.uid, userMsg)
+
     try {
       const response = await fetch('/api/julius', {
         method: 'POST',
@@ -125,7 +145,6 @@ export default function JuliusPage() {
       })
 
       if (!response.ok) throw new Error('Erro na API')
-
       const data = await response.json()
 
       const assistantMsg: JuliusMessage = {
@@ -135,11 +154,24 @@ export default function JuliusPage() {
       }
 
       setMessages((prev) => [...prev, assistantMsg])
+      if (user) await saveJuliusMessage(user.uid, assistantMsg)
     } catch {
       toast.error('Julius está ocupado trabalhando. Tente novamente.')
     } finally {
       setThinking(false)
       inputRef.current?.focus()
+    }
+  }
+
+  const handleClearChat = async () => {
+    if (!user) return
+    try {
+      await clearJuliusHistory(user.uid)
+      setMessages([])
+      reportGenerated.current = false
+      toast.success('Histórico limpo')
+    } catch {
+      toast.error('Erro ao limpar histórico')
     }
   }
 
@@ -150,12 +182,7 @@ export default function JuliusPage() {
     }
   }
 
-  const clearChat = () => {
-    setMessages([])
-    reportGenerated.current = false
-  }
-
-  if (loading) {
+  if (loading || loadingHistory) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
@@ -166,7 +193,6 @@ export default function JuliusPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-57px)] p-6 gap-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-xl">
@@ -179,15 +205,27 @@ export default function JuliusPage() {
             </p>
           </div>
         </div>
-        {messages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearChat} className="text-muted-foreground">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Nova conversa
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearChat}
+                className="text-muted-foreground"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Limpar histórico
+              </Button>
+            </>
+          )}
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <History className="w-3 h-3" />
+            <span>{messages.length} mensagens</span>
+          </div>
+        </div>
       </div>
 
-      {/* Chat area */}
       <Card className="flex-1 overflow-hidden">
         <CardContent className="p-0 h-full flex flex-col">
           <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -198,7 +236,9 @@ export default function JuliusPage() {
                 </div>
                 <div className="text-center space-y-1">
                   <p className="font-medium">Julius está preparando seu relatório mensal...</p>
-                  <p className="text-sm text-muted-foreground">Analisando seus dados de {format(subMonths(new Date(), 1), "MMMM", { locale: ptBR })}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Analisando seus dados de {format(subMonths(new Date(), 1), 'MMMM', { locale: ptBR })}
+                  </p>
                 </div>
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
@@ -212,7 +252,6 @@ export default function JuliusPage() {
                     Pode perguntar sobre suas finanças!
                   </p>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                   {JULIUS_SUGGESTIONS.map((suggestion) => (
                     <button
@@ -271,7 +310,6 @@ export default function JuliusPage() {
             )}
           </ScrollArea>
 
-          {/* Input */}
           <div className="p-4 border-t">
             <div className="flex gap-2">
               <Input
