@@ -3,27 +3,11 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
-import { Transaction, TransactionCategory, PaymentMethod } from '@/types'
-import { saveTransaction } from '@/lib/firestore'
+import { TransactionDialog } from '@/components/shared/TransactionDialog'
+import { AmountDisplay, HideValuesButton } from '@/components/shared/AmountDisplay'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   TrendingUp,
   TrendingDown,
@@ -42,18 +26,12 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { format, parseISO, addMonths } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { v4 as uuidv4 } from 'uuid'
-import { toast } from 'sonner'
+import { CategoryBadge } from '@/components/shared/CategoryBadge'
+import { PaymentMethodBadge } from '@/components/shared/PaymentMethodBadge'
 
 const COLORS = ['#00d4aa', '#ff6b6b', '#74b9ff', '#ffd166', '#a29bfe', '#fd79a8']
-
-const CATEGORIES: TransactionCategory[] = [
-  'Alimentação', 'Transporte', 'Moradia', 'Saúde',
-  'Educação', 'Lazer', 'Assinatura', 'Vestuário',
-  'Investimento', 'Outros',
-]
 
 const fmt = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -61,48 +39,7 @@ const fmt = (value: number) =>
 export default function DashboardPage() {
   const { user } = useAuth()
   const { transactions, creditCards, summary, loading } = useFinanceData(user)
-
   const [quickOpen, setQuickOpen] = useState(false)
-  const [quickForm, setQuickForm] = useState({
-    description: '',
-    amount: '',
-    category: 'Outros' as TransactionCategory,
-    paymentMethod: 'debit' as PaymentMethod,
-    creditCardId: '',
-  })
-  const [quickSaving, setQuickSaving] = useState(false)
-
-  const handleQuickSave = async () => {
-    if (!user || !quickForm.description || !quickForm.amount) {
-      toast.error('Preencha descrição e valor')
-      return
-    }
-    setQuickSaving(true)
-    try {
-      const tx: Transaction = {
-        id: uuidv4(),
-        description: quickForm.description,
-        amount: parseFloat(quickForm.amount.replace(',', '.')),
-        type: 'expense',
-        category: quickForm.category,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        paymentMethod: quickForm.paymentMethod,
-        creditCardId: quickForm.paymentMethod === 'credit_card' ? quickForm.creditCardId : undefined,
-        billingMonth: quickForm.paymentMethod === 'credit_card'
-          ? format(addMonths(new Date(), 1), 'yyyy-MM')
-          : undefined,
-        createdAt: new Date().toISOString(),
-      }
-      await saveTransaction(user.uid, tx)
-      toast.success('Despesa registrada!')
-      setQuickForm({ description: '', amount: '', category: 'Outros', paymentMethod: 'debit', creditCardId: '' })
-      setQuickOpen(false)
-    } catch {
-      toast.error('Erro ao salvar')
-    } finally {
-      setQuickSaving(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -157,11 +94,22 @@ export default function DashboardPage() {
             {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
           </p>
         </div>
-        <Button onClick={() => setQuickOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Registrar despesa
-        </Button>
+        <div className="flex items-center gap-2">
+          <HideValuesButton />
+          <Button onClick={() => setQuickOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Registrar despesa
+          </Button>
+        </div>
       </div>
+
+      <TransactionDialog
+        open={quickOpen}
+        onOpenChange={setQuickOpen}
+        userId={user?.uid || ''}
+        creditCards={creditCards}
+        defaultType="expense"
+      />
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -173,9 +121,11 @@ export default function DashboardPage() {
             <Wallet className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-              {fmt(summary.balance)}
-            </div>
+            <AmountDisplay
+              value={summary.balance}
+              type={summary.balance >= 0 ? 'income' : 'expense'}
+              className="text-2xl font-bold"
+            />
             <p className="text-xs text-muted-foreground mt-1">Histórico completo</p>
           </CardContent>
         </Card>
@@ -188,9 +138,9 @@ export default function DashboardPage() {
             <TrendingUp className="w-4 h-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-500">{fmt(currentIncome)}</div>
+            <AmountDisplay value={currentIncome} type="income" className="text-2xl font-bold" />
             <p className="text-xs text-muted-foreground mt-1">
-              Média: {fmt(summary.monthlyAvgIncome)}
+              Média: <AmountDisplay value={summary.monthlyAvgIncome} />
             </p>
           </CardContent>
         </Card>
@@ -203,9 +153,9 @@ export default function DashboardPage() {
             <TrendingDown className="w-4 h-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">{fmt(currentExpenses)}</div>
+            <AmountDisplay value={currentExpenses} type="expense" className="text-2xl font-bold" />
             <p className="text-xs text-muted-foreground mt-1">
-              Média: {fmt(summary.monthlyAvgExpenses)}
+              Média: <AmountDisplay value={summary.monthlyAvgExpenses} />
             </p>
           </CardContent>
         </Card>
@@ -218,8 +168,9 @@ export default function DashboardPage() {
             <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
             <p className="text-sm">
               <span className="font-medium text-red-500">Atenção: </span>
-              Suas despesas estão {fmt(currentExpenses - currentIncome)} acima das receitas este mês.
-              Converse com o Julius para um plano de ação.
+              Suas despesas estão{' '}
+              <AmountDisplay value={currentExpenses - currentIncome} type="expense" />{' '}
+              acima das receitas este mês.
             </p>
           </CardContent>
         </Card>
@@ -290,7 +241,7 @@ export default function DashboardPage() {
                         />
                         <span className="text-muted-foreground">{item.name}</span>
                       </div>
-                      <span className="font-medium">{fmt(item.value)}</span>
+                      <AmountDisplay value={item.value} className="font-medium" />
                     </div>
                   ))}
                 </div>
@@ -318,96 +269,27 @@ export default function DashboardPage() {
                     <div className={`w-2 h-2 rounded-full ${t.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     <div>
                       <p className="text-sm font-medium">{t.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.category} • {format(parseISO(t.date), 'dd/MM/yyyy')}
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <CategoryBadge category={t.category} />
+                        <PaymentMethodBadge method={t.paymentMethod || 'debit'} />
+                        <span className="text-xs text-muted-foreground">
+                          {format(parseISO(t.date), 'dd/MM/yyyy')}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <Badge variant={t.type === 'income' ? 'default' : 'destructive'} className="text-xs">
-                    {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
-                  </Badge>
+                  <AmountDisplay
+                    value={t.amount}
+                    type={t.type}
+                    showSign
+                    className="font-semibold"
+                  />
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Modal despesa rápida */}
-      <Dialog open={quickOpen} onOpenChange={setQuickOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Registrar despesa rápida</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input
-                placeholder="Ex: Almoço, Uber..."
-                value={quickForm.description}
-                onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })}
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input
-                placeholder="0,00"
-                value={quickForm.amount}
-                onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select
-                value={quickForm.category}
-                onValueChange={(v) => setQuickForm({ ...quickForm, category: v as TransactionCategory })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Forma de pagamento</Label>
-              <Select
-                value={quickForm.paymentMethod}
-                onValueChange={(v) => setQuickForm({ ...quickForm, paymentMethod: v as PaymentMethod, creditCardId: '' })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="debit">Débito</SelectItem>
-                  <SelectItem value="pix">Pix</SelectItem>
-                  <SelectItem value="cash">Dinheiro</SelectItem>
-                  <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {quickForm.paymentMethod === 'credit_card' && creditCards.length > 0 && (
-              <div className="space-y-2">
-                <Label>Cartão</Label>
-                <Select
-                  value={quickForm.creditCardId}
-                  onValueChange={(v) => setQuickForm({ ...quickForm, creditCardId: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {creditCards.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <Button className="w-full" onClick={handleQuickSave} disabled={quickSaving}>
-              {quickSaving ? 'Salvando...' : 'Registrar'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

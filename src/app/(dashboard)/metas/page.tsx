@@ -5,11 +5,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { Goal } from '@/types'
 import { saveGoal, deleteGoal } from '@/lib/firestore'
+import { GoalCard } from '@/components/shared/GoalCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
@@ -19,13 +18,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Plus, Trash2, Target } from 'lucide-react'
-import { format, parseISO, differenceInDays } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { Plus, Target } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
-
-const fmt = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
 const GOAL_ICONS = ['🏠', '🚗', '✈️', '📱', '💻', '🎓', '💍', '🏦', '🛡️', '🎯']
 
@@ -130,7 +124,6 @@ export default function MetasPage() {
               <DialogTitle>Nova Meta Financeira</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              {/* Ícone */}
               <div className="space-y-2">
                 <Label>Ícone</Label>
                 <div className="flex flex-wrap gap-2">
@@ -150,7 +143,6 @@ export default function MetasPage() {
                 </div>
               </div>
 
-              {/* Título */}
               <div className="space-y-2">
                 <Label>Título</Label>
                 <Input
@@ -160,7 +152,6 @@ export default function MetasPage() {
                 />
               </div>
 
-              {/* Valores */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Valor alvo (R$)</Label>
@@ -180,7 +171,6 @@ export default function MetasPage() {
                 </div>
               </div>
 
-              {/* Prazo */}
               <div className="space-y-2">
                 <Label>Prazo</Label>
                 <Input
@@ -210,84 +200,14 @@ export default function MetasPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {goals.map((goal) => {
-            const progress = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100)
-            const daysLeft = differenceInDays(parseISO(goal.deadline), new Date())
-            const remaining = goal.targetAmount - goal.currentAmount
-            const isCompleted = progress >= 100
-
-            return (
-              <Card key={goal.id} className={isCompleted ? 'border-emerald-500/50' : ''}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{goal.icon}</span>
-                      <div>
-                        <CardTitle className="text-base">{goal.title}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Prazo: {format(parseISO(goal.deadline), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-8 h-8 text-muted-foreground hover:text-red-500"
-                      onClick={() => handleDelete(goal.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">
-                        {fmt(goal.currentAmount)} de {fmt(goal.targetAmount)}
-                      </span>
-                      <span className="font-medium">{progress.toFixed(0)}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
-
-                  {!isCompleted && (
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Faltam {fmt(remaining)}</span>
-                      <span>
-                        {daysLeft > 0
-                          ? `${daysLeft} dias restantes`
-                          : daysLeft === 0
-                          ? 'Vence hoje!'
-                          : `Vencida há ${Math.abs(daysLeft)} dias`}
-                      </span>
-                    </div>
-                  )}
-
-                  {isCompleted && (
-                    <p className="text-sm text-emerald-500 font-medium text-center">
-                      🎉 Meta concluída!
-                    </p>
-                  )}
-
-                  {!isCompleted && (
-                    <div className="flex gap-2">
-                      {[50, 100, 500].map((amount) => (
-                        <Button
-                          key={amount}
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-xs"
-                          onClick={() => handleAddAmount(goal, amount)}
-                        >
-                          +{fmt(amount)}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
+          {goals.map((goal) => (
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              onDelete={handleDelete}
+              onAddAmount={handleAddAmount}
+            />
+          ))}
         </div>
       )}
     </div>

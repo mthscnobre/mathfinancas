@@ -12,12 +12,15 @@ import {
   saveInvestment,
   deleteInvestment,
 } from '@/lib/firestore'
+import { CreditCardCard } from '@/components/shared/CreditCardCard'
+import { PiggybankCard } from '@/components/shared/PiggybankCard'
+import { InvestmentCard } from '@/components/shared/InvestmentCard'
+import { AmountDisplay } from '@/components/shared/AmountDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
@@ -34,13 +37,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Trash2, CreditCard as CreditCardIcon, PiggyBank, TrendingUp } from 'lucide-react'
+import { Plus, CreditCard as CreditCardIcon, PiggyBank, TrendingUp } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { v4 as uuidv4 } from 'uuid'
-
-const fmt = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
 const INVESTMENT_TYPES: InvestmentType[] = [
   'CDB', 'LCI', 'LCA', 'Tesouro Direto', 'Poupança',
@@ -58,21 +57,16 @@ export default function PatrimonioPage() {
   const { user } = useAuth()
   const { creditCards, piggybanks, investments, summary, loading } = useFinanceData(user)
 
-  // Cartões
   const [cardOpen, setCardOpen] = useState(false)
   const [cardForm, setCardForm] = useState({
     name: '', limit: '', closingDay: '', dueDay: '', color: CARD_COLORS[0],
   })
 
-  // Caixinhas
   const [piggyOpen, setPiggyOpen] = useState(false)
   const [piggyForm, setPiggyForm] = useState({
     name: '', targetAmount: '', currentAmount: '', icon: '🐷',
   })
-  const [piggyAddOpen, setPiggyAddOpen] = useState<string | null>(null)
-  const [piggyAddAmount, setPiggyAddAmount] = useState('')
 
-  // Investimentos
   const [investOpen, setInvestOpen] = useState(false)
   const [investForm, setInvestForm] = useState({
     name: '', type: 'CDB' as InvestmentType, investedAmount: '',
@@ -114,7 +108,9 @@ export default function PatrimonioPage() {
       const piggy: Piggybank = {
         id: uuidv4(),
         name: piggyForm.name,
-        targetAmount: piggyForm.targetAmount ? parseFloat(piggyForm.targetAmount.replace(',', '.')) : undefined,
+        targetAmount: piggyForm.targetAmount
+          ? parseFloat(piggyForm.targetAmount.replace(',', '.'))
+          : undefined,
         currentAmount: parseFloat(piggyForm.currentAmount.replace(',', '.')) || 0,
         icon: piggyForm.icon,
         createdAt: new Date().toISOString(),
@@ -128,18 +124,11 @@ export default function PatrimonioPage() {
     }
   }
 
-  const handleAddToPiggy = async (piggy: Piggybank) => {
-    if (!user || !piggyAddAmount) return
+  const handleAddToPiggy = async (piggy: Piggybank, amount: number) => {
+    if (!user) return
     try {
-      const amount = parseFloat(piggyAddAmount.replace(',', '.'))
-      const updated: Piggybank = {
-        ...piggy,
-        currentAmount: piggy.currentAmount + amount,
-      }
-      await savePiggybank(user.uid, updated)
+      await savePiggybank(user.uid, { ...piggy, currentAmount: piggy.currentAmount + amount })
       toast.success('Valor adicionado!')
-      setPiggyAddAmount('')
-      setPiggyAddOpen(null)
     } catch {
       toast.error('Erro ao atualizar caixinha')
     }
@@ -161,10 +150,10 @@ export default function PatrimonioPage() {
           ? parseFloat(investForm.currentAmount.replace(',', '.'))
           : invested,
         startDate: investForm.startDate,
-        dueDate: investForm.dueDate || undefined,
+        ...(investForm.dueDate ? { dueDate: investForm.dueDate } : {}),
         liquidity: investForm.liquidity,
         institution: investForm.institution,
-        rate: investForm.rate || undefined,
+        ...(investForm.rate ? { rate: investForm.rate } : {}),
         createdAt: new Date().toISOString(),
       }
       await saveInvestment(user.uid, investment)
@@ -194,11 +183,10 @@ export default function PatrimonioPage() {
       <div>
         <h1 className="text-2xl font-bold">Patrimônio</h1>
         <p className="text-muted-foreground text-sm">
-          Patrimônio líquido: {fmt(summary.netWorth)}
+          Patrimônio líquido: <AmountDisplay value={summary.netWorth} />
         </p>
       </div>
 
-      {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -207,7 +195,9 @@ export default function PatrimonioPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-500">{fmt(summary.totalNextInvoice)}</p>
+            <p className="text-2xl font-bold text-red-500">
+              <AmountDisplay value={summary.totalNextInvoice} />
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               {creditCards.length} {creditCards.length === 1 ? 'cartão' : 'cartões'}
             </p>
@@ -221,7 +211,9 @@ export default function PatrimonioPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-500">{fmt(summary.totalPiggybanks)}</p>
+            <p className="text-2xl font-bold text-blue-500">
+              <AmountDisplay value={summary.totalPiggybanks} />
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               {piggybanks.length} {piggybanks.length === 1 ? 'caixinha' : 'caixinhas'}
             </p>
@@ -235,9 +227,11 @@ export default function PatrimonioPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-emerald-500">{fmt(summary.totalCurrentInvestments)}</p>
+            <p className="text-2xl font-bold text-emerald-500">
+              <AmountDisplay value={summary.totalCurrentInvestments} />
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Aportado: {fmt(summary.totalInvested)}
+              Aportado: <AmountDisplay value={summary.totalInvested} />
             </p>
           </CardContent>
         </Card>
@@ -306,46 +300,15 @@ export default function PatrimonioPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {creditCards.map((card) => {
-                const currentInvoice = summary.currentMonthInvoice[card.id] || 0
-                const nextInvoice = summary.nextMonthInvoice[card.id] || 0
-                const usagePercent = (currentInvoice / card.limit) * 100
-
-                return (
-                  <Card key={card.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-7 rounded-md" style={{ backgroundColor: card.color }} />
-                          <div>
-                            <CardTitle className="text-base">{card.name}</CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                              Fecha dia {card.closingDay} · Vence dia {card.dueDay}
-                            </p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-red-500"
-                          onClick={() => { if (user) deleteCreditCard(user.uid, card.id) }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-muted-foreground">Fatura atual</span>
-                          <span className="font-medium">{fmt(currentInvoice)} / {fmt(card.limit)}</span>
-                        </div>
-                        <Progress value={Math.min(usagePercent, 100)} className="h-2" />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Próxima fatura estimada</span>
-                        <span className="font-medium text-foreground">{fmt(nextInvoice)}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+              {creditCards.map((card) => (
+                <CreditCardCard
+                  key={card.id}
+                  card={card}
+                  currentInvoice={summary.currentMonthInvoice[card.id] || 0}
+                  nextInvoice={summary.nextMonthInvoice[card.id] || 0}
+                  onDelete={(id) => { if (user) deleteCreditCard(user.uid, id) }}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
@@ -400,59 +363,14 @@ export default function PatrimonioPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {piggybanks.map((piggy) => {
-                const progress = piggy.targetAmount
-                  ? Math.min((piggy.currentAmount / piggy.targetAmount) * 100, 100)
-                  : null
-
-                return (
-                  <Card key={piggy.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">{piggy.icon}</span>
-                          <CardTitle className="text-base">{piggy.name}</CardTitle>
-                        </div>
-                        <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-red-500"
-                          onClick={() => { if (user) deletePiggybank(user.uid, piggy.id) }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-2xl font-bold">{fmt(piggy.currentAmount)}</p>
-                      {piggy.targetAmount && progress !== null && (
-                        <div>
-                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span>Meta: {fmt(piggy.targetAmount)}</span>
-                            <span>{progress.toFixed(0)}%</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        {piggyAddOpen === piggy.id ? (
-                          <>
-                            <Input
-                              placeholder="Valor"
-                              value={piggyAddAmount}
-                              onChange={(e) => setPiggyAddAmount(e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                            <Button size="sm" onClick={() => handleAddToPiggy(piggy)}>+</Button>
-                            <Button size="sm" variant="ghost" onClick={() => setPiggyAddOpen(null)}>✕</Button>
-                          </>
-                        ) : (
-                          <Button size="sm" variant="outline" className="w-full"
-                            onClick={() => setPiggyAddOpen(piggy.id)}>
-                            Adicionar valor
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+              {piggybanks.map((piggy) => (
+                <PiggybankCard
+                  key={piggy.id}
+                  piggy={piggy}
+                  onDelete={(id) => { if (user) deletePiggybank(user.uid, id) }}
+                  onAddAmount={handleAddToPiggy}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
@@ -544,47 +462,13 @@ export default function PatrimonioPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {investments.map((inv) => {
-                const rendimento = inv.currentAmount - inv.investedAmount
-                const rendimentoPercent = (rendimento / inv.investedAmount) * 100
-
-                return (
-                  <Card key={inv.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-base">{inv.name}</CardTitle>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {inv.type} · {inv.institution}
-                            {inv.rate && ` · ${inv.rate}`}
-                          </p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-red-500"
-                          onClick={() => { if (user) deleteInvestment(user.uid, inv.id) }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="text-2xl font-bold">{fmt(inv.currentAmount)}</p>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Aportado: {fmt(inv.investedAmount)}</span>
-                        <span className={rendimento >= 0 ? 'text-emerald-500' : 'text-red-500'}>
-                          {rendimento >= 0 ? '+' : ''}{fmt(rendimento)} ({rendimentoPercent.toFixed(2)}%)
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Início: {format(parseISO(inv.startDate), 'dd/MM/yyyy')}</span>
-                        <span>
-                          {inv.liquidity === 'daily' ? '💧 Liquidez diária' :
-                           inv.dueDate ? `Vence: ${format(parseISO(inv.dueDate), 'dd/MM/yyyy')}` :
-                           'No vencimento'}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+              {investments.map((inv) => (
+                <InvestmentCard
+                  key={inv.id}
+                  investment={inv}
+                  onDelete={(id) => { if (user) deleteInvestment(user.uid, id) }}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
