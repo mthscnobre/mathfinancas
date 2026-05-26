@@ -20,7 +20,20 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "MathFinanças",
-  description: "Controle financeiro inteligente com Julius",
+  description: "Controle financeiro inteligente",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MathFinanças",
+  },
+};
+
+export const viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
