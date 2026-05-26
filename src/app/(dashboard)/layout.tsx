@@ -13,6 +13,7 @@ import {
   MessageCircle,
   LogOut,
   TrendingUp,
+  Landmark,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -23,6 +24,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transacoes', label: 'Transações', icon: ArrowLeftRight },
   { href: '/metas', label: 'Metas', icon: Target },
+  { href: '/patrimonio', label: 'Patrimônio', icon: Landmark },
   { href: '/julius', label: 'Julius', icon: MessageCircle },
 ]
 

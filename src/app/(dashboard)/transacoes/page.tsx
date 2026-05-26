@@ -3,12 +3,12 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
-import { Transaction, TransactionCategory } from '@/types'
+import { Transaction, TransactionCategory, PaymentMethod } from '@/types'
 import { saveTransaction, deleteTransaction } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -26,8 +26,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Trash2, Search } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { Plus, Trash2, Search, CreditCard } from 'lucide-react'
+import { format, parseISO, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -35,6 +35,13 @@ const CATEGORIES: TransactionCategory[] = [
   'Alimentação', 'Transporte', 'Moradia', 'Saúde',
   'Educação', 'Lazer', 'Assinatura', 'Vestuário',
   'Investimento', 'Outros',
+]
+
+const PAYMENT_METHODS = [
+  { value: 'debit', label: 'Débito' },
+  { value: 'pix', label: 'Pix' },
+  { value: 'cash', label: 'Dinheiro' },
+  { value: 'credit_card', label: 'Cartão de Crédito' },
 ]
 
 const fmt = (value: number) =>
@@ -46,6 +53,8 @@ const emptyForm = {
   type: 'expense' as 'income' | 'expense',
   category: 'Outros' as TransactionCategory,
   date: format(new Date(), 'yyyy-MM-dd'),
+  paymentMethod: 'debit' as PaymentMethod,
+  creditCardId: '',
   local: '',
   notes: '',
   installmentTotal: '',
@@ -53,7 +62,7 @@ const emptyForm = {
 
 export default function TransacoesPage() {
   const { user } = useAuth()
-  const { transactions, loading } = useFinanceData(user)
+  const { transactions, creditCards, loading } = useFinanceData(user)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
@@ -67,6 +76,11 @@ export default function TransacoesPage() {
       return
     }
 
+    if (form.paymentMethod === 'credit_card' && !form.creditCardId) {
+      toast.error('Selecione um cartão de crédito')
+      return
+    }
+
     setSaving(true)
     try {
       const amount = parseFloat(form.amount.replace(',', '.'))
@@ -75,6 +89,10 @@ export default function TransacoesPage() {
       for (let i = 0; i < installments; i++) {
         const date = new Date(form.date)
         date.setMonth(date.getMonth() + i)
+
+        const billingMonth = form.paymentMethod === 'credit_card'
+          ? format(addMonths(new Date(form.date), i + 1), 'yyyy-MM')
+          : undefined
 
         const tx: Transaction = {
           id: uuidv4(),
@@ -85,6 +103,9 @@ export default function TransacoesPage() {
           type: form.type,
           category: form.category,
           date: format(date, 'yyyy-MM-dd'),
+          paymentMethod: form.paymentMethod,
+          creditCardId: form.paymentMethod === 'credit_card' ? form.creditCardId : undefined,
+          billingMonth,
           local: form.local || undefined,
           notes: form.notes || undefined,
           installmentTotal: installments > 1 ? installments : undefined,
@@ -97,7 +118,7 @@ export default function TransacoesPage() {
 
       toast.success(
         installments > 1
-          ? `${installments} parcelas lançadas com sucesso!`
+          ? `${installments} parcelas lançadas!`
           : 'Transação salva!'
       )
       setForm(emptyForm)
@@ -128,6 +149,16 @@ export default function TransacoesPage() {
     const matchCategory = filterCategory === 'all' || t.category === filterCategory
     return matchSearch && matchType && matchCategory
   })
+
+  const getPaymentLabel = (method: PaymentMethod) => {
+    const labels: Record<PaymentMethod, string> = {
+      debit: 'Débito',
+      pix: 'Pix',
+      cash: 'Dinheiro',
+      credit_card: 'Crédito',
+    }
+    return labels[method]
+  }
 
   if (loading) {
     return (
@@ -226,6 +257,60 @@ export default function TransacoesPage() {
                 </Select>
               </div>
 
+              {/* Método de pagamento */}
+              {form.type === 'expense' && (
+                <div className="space-y-2">
+                  <Label>Forma de pagamento</Label>
+                  <Select
+                    value={form.paymentMethod}
+                    onValueChange={(v) => setForm({ ...form, paymentMethod: v as PaymentMethod, creditCardId: '' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Cartão de crédito */}
+              {form.type === 'expense' && form.paymentMethod === 'credit_card' && (
+                <div className="space-y-2">
+                  <Label>Cartão</Label>
+                  {creditCards.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Nenhum cartão cadastrado. Cadastre um cartão primeiro.
+                    </p>
+                  ) : (
+                    <Select
+                      value={form.creditCardId}
+                      onValueChange={(v) => setForm({ ...form, creditCardId: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o cartão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {creditCards.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: c.color }}
+                              />
+                              {c.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
               {/* Local */}
               <div className="space-y-2">
                 <Label>Local (opcional)</Label>
@@ -261,11 +346,7 @@ export default function TransacoesPage() {
                 />
               </div>
 
-              <Button
-                className="w-full"
-                onClick={handleSave}
-                disabled={saving}
-              >
+              <Button className="w-full" onClick={handleSave} disabled={saving}>
                 {saving ? 'Salvando...' : 'Salvar Transação'}
               </Button>
             </div>
@@ -316,42 +397,63 @@ export default function TransacoesPage() {
             </div>
           ) : (
             <div className="divide-y">
-              {filtered.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-8 rounded-full ${t.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                    <div>
-                      <p className="text-sm font-medium">{t.description}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground">
-                          {format(parseISO(t.date), 'dd/MM/yyyy')}
-                        </span>
-                        <Badge variant="outline" className="text-xs py-0">
-                          {t.category}
-                        </Badge>
-                        {t.local && (
+              {filtered.map((t) => {
+                const card = t.creditCardId
+                  ? creditCards.find((c) => c.id === t.creditCardId)
+                  : null
+
+                return (
+                  <div key={t.id} className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-8 rounded-full ${t.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <div>
+                        <p className="text-sm font-medium">{t.description}</p>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <span className="text-xs text-muted-foreground">
-                            📍 {t.local}
+                            {format(parseISO(t.date), 'dd/MM/yyyy')}
                           </span>
-                        )}
+                          <Badge variant="outline" className="text-xs py-0">
+                            {t.category}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs py-0">
+                            {getPaymentLabel(t.paymentMethod || 'debit')}
+                          </Badge>
+                          {card && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs py-0 flex items-center gap-1"
+                            >
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: card.color }}
+                              />
+                              {card.name}
+                            </Badge>
+                          )}
+                          {t.local && (
+                            <span className="text-xs text-muted-foreground">
+                              📍 {t.local}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-semibold ${t.type === 'income' ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-8 h-8 text-muted-foreground hover:text-red-500"
+                        onClick={() => handleDelete(t.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`font-semibold ${t.type === 'income' ? 'text-emerald-500' : 'text-red-500'}`}>
-                      {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-8 h-8 text-muted-foreground hover:text-red-500"
-                      onClick={() => handleDelete(t.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

@@ -1,5 +1,7 @@
 export type TransactionType = 'income' | 'expense'
 
+export type PaymentMethod = 'debit' | 'pix' | 'cash' | 'credit_card'
+
 export type TransactionCategory =
   | 'Alimentação'
   | 'Transporte'
@@ -12,6 +14,18 @@ export type TransactionCategory =
   | 'Investimento'
   | 'Outros'
 
+export type InvestmentType =
+  | 'CDB'
+  | 'LCI'
+  | 'LCA'
+  | 'Tesouro Direto'
+  | 'Poupança'
+  | 'Fundos'
+  | 'Ações'
+  | 'FII'
+  | 'Criptomoedas'
+  | 'Outros'
+
 export interface Transaction {
   id: string
   description: string
@@ -19,11 +33,24 @@ export interface Transaction {
   type: TransactionType
   category: TransactionCategory
   date: string // YYYY-MM-DD
+  paymentMethod: PaymentMethod
+  creditCardId?: string
+  billingMonth?: string // YYYY-MM — mês da fatura se crédito
   local?: string
   notes?: string
   installmentTotal?: number
   installmentCurrent?: number
   recurrenceId?: string
+  createdAt: string
+}
+
+export interface CreditCard {
+  id: string
+  name: string // "Nubank", "Inter", "C6"
+  limit: number
+  closingDay: number // dia de fechamento da fatura
+  dueDay: number // dia de vencimento
+  color: string // hex color
   createdAt: string
 }
 
@@ -37,12 +64,38 @@ export interface Goal {
   createdAt: string
 }
 
+export interface Piggybank {
+  id: string
+  name: string // "Viagem", "Emergência", "Reserva"
+  targetAmount?: number // opcional — pode ser sem meta
+  currentAmount: number
+  icon?: string
+  color?: string
+  createdAt: string
+}
+
+export interface Investment {
+  id: string
+  name: string // "CDB Nubank 100%CDI"
+  type: InvestmentType
+  investedAmount: number // valor aportado
+  currentAmount: number // valor atual com rendimento
+  startDate: string // YYYY-MM-DD
+  dueDate?: string // YYYY-MM-DD — vencimento se tiver
+  liquidity: 'daily' | 'on_due_date' | 'custom'
+  institution: string // "Nubank", "XP", "Tesouro"
+  rate?: string // "100% CDI", "IPCA+5%"
+  createdAt: string
+}
+
 export interface Recurrence {
   id: string
   description: string
   amount: number
   type: TransactionType
   category: TransactionCategory
+  paymentMethod: PaymentMethod
+  creditCardId?: string
   dayOfMonth: number
   active: boolean
   createdAt: string
@@ -52,6 +105,7 @@ export interface UserSettings {
   customCategories?: string[]
   currency?: string
   timezone?: string
+  hideValues?: boolean
 }
 
 export interface MonthlyData {
@@ -69,12 +123,32 @@ export interface JuliusMessage {
 }
 
 export interface FinancialSummary {
+  // Saldos
   totalIncome: number
   totalExpenses: number
-  balance: number
+  balance: number // receitas - despesas débito/pix/dinheiro
+  committedBalance: number // balance - faturas abertas
+  
+  // Cartões
+  creditCards: CreditCard[]
+  currentMonthInvoice: Record<string, number> // cardId -> valor fatura mês atual
+  nextMonthInvoice: Record<string, number> // cardId -> valor fatura mês seguinte
+  totalNextInvoice: number // soma de todas as faturas do mês seguinte
+  
+  // Caixinhas e investimentos
+  piggybanks: Piggybank[]
+  investments: Investment[]
+  totalPiggybanks: number
+  totalInvested: number
+  totalCurrentInvestments: number
+  netWorth: number // patrimônio total
+  
+  // Análise
   topCategories: { category: string; amount: number }[]
   monthlyAvgIncome: number
   monthlyAvgExpenses: number
+  
+  // Dados brutos
   transactions: Transaction[]
   goals: Goal[]
 }
