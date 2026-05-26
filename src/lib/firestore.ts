@@ -168,3 +168,17 @@ export const subscribeBudgets = (
     callback(snap.docs.map((d) => d.data() as CategoryBudget))
   })
 }
+
+// ===== JULIUS REPORT =====
+export const getLastReport = async (userId: string): Promise<string | null> => {
+  const snap = await getDocs(collection(db, 'users', userId, 'julius_reports'))
+  if (snap.empty) return null
+  const docs = snap.docs.map(d => d.data())
+  const sorted = docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return sorted[0]?.createdAt || null
+}
+
+export const saveReport = async (userId: string, report: { content: string; createdAt: string }) => {
+  const id = report.createdAt.substring(0, 7) // YYYY-MM
+  await setDoc(doc(db, 'users', userId, 'julius_reports', id), report)
+}

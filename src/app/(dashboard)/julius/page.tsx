@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { JuliusMessage } from '@/types'
+import { getLastReport, saveReport } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { Send, Loader2, RefreshCw } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 const JULIUS_SUGGESTIONS = [
@@ -29,14 +30,74 @@ export default function JuliusPage() {
   const [messages, setMessages] = useState<JuliusMessage[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
+  const [loadingReport, setLoadingReport] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const reportGenerated = useRef(false)
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  // Relatório automático no primeiro dia do mês
+  useEffect(() => {
+    if (!user || loading || reportGenerated.current) return
+
+    const checkAndGenerateReport = async () => {
+      const today = new Date()
+      const isFirstDay = today.getDate() === 1
+      if (!isFirstDay) return
+
+      const lastReport = await getLastReport(user.uid)
+      const currentMonth = format(today, 'yyyy-MM')
+
+      if (lastReport && lastReport.startsWith(currentMonth)) return
+
+      reportGenerated.current = true
+      setLoadingReport(true)
+
+      const lastMonthLabel = format(subMonths(today, 1), "MMMM 'de' yyyy", { locale: ptBR })
+
+      const autoMessage = `Gere um relatório completo do mês de ${lastMonthLabel}. Analise receitas, despesas, categorias principais, comparação com médias históricas, pontos de atenção e recomendações para este novo mês. Use sua personalidade característica.`
+
+      try {
+        const response = await fetch('/api/julius', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: autoMessage,
+            summary,
+            history: [],
+          }),
+        })
+
+        if (!response.ok) throw new Error()
+
+        const data = await response.json()
+
+        const reportMsg: JuliusMessage = {
+          role: 'assistant',
+          content: `📊 *Relatório de ${lastMonthLabel}*\n\n${data.response}`,
+          timestamp: new Date().toISOString(),
+        }
+
+        setMessages([reportMsg])
+
+        await saveReport(user.uid, {
+          content: data.response,
+          createdAt: new Date().toISOString(),
+        })
+      } catch {
+        toast.error('Não foi possível gerar o relatório mensal')
+      } finally {
+        setLoadingReport(false)
+      }
+    }
+
+    checkAndGenerateReport()
+  }, [user, loading, summary])
 
   const sendMessage = async (text?: string) => {
     const message = text || input.trim()
@@ -91,6 +152,7 @@ export default function JuliusPage() {
 
   const clearChat = () => {
     setMessages([])
+    reportGenerated.current = false
   }
 
   if (loading) {
@@ -103,7 +165,7 @@ export default function JuliusPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen p-6 gap-4">
+    <div className="flex flex-col h-[calc(100vh-57px)] p-6 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -129,7 +191,18 @@ export default function JuliusPage() {
       <Card className="flex-1 overflow-hidden">
         <CardContent className="p-0 h-full flex flex-col">
           <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-            {messages.length === 0 ? (
+            {loadingReport ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4 py-8">
+                <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-xl">
+                  👨🏿
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="font-medium">Julius está preparando seu relatório mensal...</p>
+                  <p className="text-sm text-muted-foreground">Analisando seus dados de {format(subMonths(new Date(), 1), "MMMM", { locale: ptBR })}</p>
+                </div>
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-6 py-8">
                 <div className="text-center space-y-2">
                   <p className="text-4xl">💰</p>
@@ -207,11 +280,11 @@ export default function JuliusPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={thinking}
+                disabled={thinking || loadingReport}
               />
               <Button
                 onClick={() => sendMessage()}
-                disabled={!input.trim() || thinking}
+                disabled={!input.trim() || thinking || loadingReport}
                 size="icon"
               >
                 {thinking ? (
