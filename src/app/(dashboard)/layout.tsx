@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Landmark,
   RefreshCw,
+  PieChart,
   Sun,
   Moon,
   Eye,
@@ -43,6 +44,7 @@ const navItems = [
   { href: '/recorrencias', label: 'Recorrências', icon: RefreshCw },
   { href: '/metas', label: 'Metas', icon: Target },
   { href: '/patrimonio', label: 'Patrimônio', icon: Landmark },
+  { href: '/orcamentos', label: 'Orçamentos', icon: PieChart },
   { href: '/julius', label: 'Julius', icon: MessageCircle },
 ]
 

@@ -148,3 +148,23 @@ export const subscribeInvestments = (
     callback(snap.docs.map((d) => d.data() as Investment))
   })
 }
+
+import { CategoryBudget } from '@/types'
+
+// ===== BUDGETS =====
+export const saveBudget = async (userId: string, budget: CategoryBudget) => {
+  await setDoc(doc(db, 'users', userId, 'budgets', budget.id), budget)
+}
+
+export const deleteBudget = async (userId: string, id: string) => {
+  await deleteDoc(doc(db, 'users', userId, 'budgets', id))
+}
+
+export const subscribeBudgets = (
+  userId: string,
+  callback: (budgets: CategoryBudget[]) => void
+) => {
+  return onSnapshot(collection(db, 'users', userId, 'budgets'), (snap) => {
+    callback(snap.docs.map((d) => d.data() as CategoryBudget))
+  })
+}

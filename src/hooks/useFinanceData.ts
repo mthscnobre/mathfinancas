@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { User } from 'firebase/auth'
-import { Transaction, Goal, Recurrence, FinancialSummary, CreditCard, Piggybank, Investment } from '@/types'
+import {
+  Transaction,
+  Goal,
+  Recurrence,
+  FinancialSummary,
+  CreditCard,
+  Piggybank,
+  Investment,
+  CategoryBudget,
+} from '@/types'
 import {
   subscribeTransactions,
   subscribeGoals,
@@ -10,6 +19,7 @@ import {
   subscribeCreditCards,
   subscribePiggybanks,
   subscribeInvestments,
+  subscribeBudgets,
 } from '@/lib/firestore'
 import { format, addMonths } from 'date-fns'
 
@@ -20,6 +30,7 @@ export function useFinanceData(user: User | null) {
   const [creditCards, setCreditCards] = useState<CreditCard[]>([])
   const [piggybanks, setPiggybanks] = useState<Piggybank[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
+  const [budgets, setBudgets] = useState<CategoryBudget[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,6 +41,7 @@ export function useFinanceData(user: User | null) {
       setCreditCards([])
       setPiggybanks([])
       setInvestments([])
+      setBudgets([])
       setLoading(false)
       return
     }
@@ -37,7 +49,11 @@ export function useFinanceData(user: User | null) {
     setLoading(true)
 
     const unsubTx = subscribeTransactions(user.uid, (data) => {
-      setTransactions(data)
+      const normalized = data.map((t) => ({
+        ...t,
+        paymentMethod: t.paymentMethod || 'debit',
+      }))
+      setTransactions(normalized)
       setLoading(false)
     })
     const unsubGoals = subscribeGoals(user.uid, (data) => setGoals(data))
@@ -45,6 +61,7 @@ export function useFinanceData(user: User | null) {
     const unsubCards = subscribeCreditCards(user.uid, (data) => setCreditCards(data))
     const unsubPiggy = subscribePiggybanks(user.uid, (data) => setPiggybanks(data))
     const unsubInvest = subscribeInvestments(user.uid, (data) => setInvestments(data))
+    const unsubBudgets = subscribeBudgets(user.uid, (data) => setBudgets(data))
 
     return () => {
       unsubTx()
@@ -53,6 +70,7 @@ export function useFinanceData(user: User | null) {
       unsubCards()
       unsubPiggy()
       unsubInvest()
+      unsubBudgets()
     }
   }, [user])
 
@@ -113,11 +131,36 @@ export function useFinanceData(user: User | null) {
     const totalCurrentInvestments = investments.reduce((acc, i) => acc + i.currentAmount, 0)
     const netWorth = balance + totalPiggybanks + totalCurrentInvestments
 
+    // Orçamentos do mês atual
+    const currentMonthBudgets = budgets.filter((b) => b.month === currentMonth)
+    const currentMonthExpenses = transactions.filter(
+      (t) => t.type === 'expense' && t.date.startsWith(currentMonth)
+    )
+
+    const budgetStatus = currentMonthBudgets.map((budget) => {
+      const spent = currentMonthExpenses
+        .filter((t) => t.category === budget.category)
+        .reduce((acc, t) => acc + t.amount, 0)
+      const percent = budget.limit > 0 ? (spent / budget.limit) * 100 : 0
+      const status =
+        percent >= 100 ? 'exceeded' : percent >= 80 ? 'warning' : 'ok'
+
+      return {
+        category: budget.category,
+        limit: budget.limit,
+        spent,
+        percent,
+        status: status as 'ok' | 'warning' | 'exceeded',
+      }
+    })
+
     return {
       totalIncome,
       totalExpenses,
       balance,
       committedBalance,
+      budgets: currentMonthBudgets,
+      budgetStatus,
       creditCards,
       currentMonthInvoice,
       nextMonthInvoice,
@@ -136,5 +179,5 @@ export function useFinanceData(user: User | null) {
     }
   })()
 
-  return { transactions, goals, recurrences, creditCards, piggybanks, investments, summary, loading }
+  return { transactions, goals, recurrences, creditCards, piggybanks, investments, budgets, summary, loading }
 }

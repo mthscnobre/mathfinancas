@@ -122,32 +122,50 @@ export interface JuliusMessage {
   timestamp: string
 }
 
+export interface CategoryBudget {
+  id: string
+  category: TransactionCategory
+  limit: number
+  month: string // YYYY-MM
+  createdAt: string
+}
+
 export interface FinancialSummary {
   // Saldos
   totalIncome: number
   totalExpenses: number
-  balance: number // receitas - despesas débito/pix/dinheiro
-  committedBalance: number // balance - faturas abertas
-  
+  balance: number
+  committedBalance: number
+
+  // Orçamentos
+  budgets: CategoryBudget[]
+  budgetStatus: {
+    category: string
+    limit: number
+    spent: number
+    percent: number
+    status: 'ok' | 'warning' | 'exceeded'
+  }[]
+
   // Cartões
   creditCards: CreditCard[]
-  currentMonthInvoice: Record<string, number> // cardId -> valor fatura mês atual
-  nextMonthInvoice: Record<string, number> // cardId -> valor fatura mês seguinte
-  totalNextInvoice: number // soma de todas as faturas do mês seguinte
-  
+  currentMonthInvoice: Record<string, number>
+  nextMonthInvoice: Record<string, number>
+  totalNextInvoice: number
+
   // Caixinhas e investimentos
   piggybanks: Piggybank[]
   investments: Investment[]
   totalPiggybanks: number
   totalInvested: number
   totalCurrentInvestments: number
-  netWorth: number // patrimônio total
-  
+  netWorth: number
+
   // Análise
   topCategories: { category: string; amount: number }[]
   monthlyAvgIncome: number
   monthlyAvgExpenses: number
-  
+
   // Dados brutos
   transactions: Transaction[]
   goals: Goal[]

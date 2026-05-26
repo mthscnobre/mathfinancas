@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import Link from 'next/link'
+import { Progress } from '@/components/ui/progress'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { TransactionDialog } from '@/components/shared/TransactionDialog'
 import { AmountDisplay, HideValuesButton } from '@/components/shared/AmountDisplay'
@@ -250,6 +252,38 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Orçamentos do mês */}
+{summary.budgetStatus.length > 0 && (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between">
+      <CardTitle className="text-sm font-medium">Orçamentos do Mês</CardTitle>
+      <Link href="/orcamentos" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+        Ver todos
+      </Link>
+    </CardHeader>
+    <CardContent className="space-y-3">
+      {summary.budgetStatus.slice(0, 4).map((bs) => (
+        <div key={bs.category} className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">{bs.category}</span>
+            <span className={
+              bs.status === 'exceeded' ? 'text-red-500' :
+              bs.status === 'warning' ? 'text-amber-500' :
+              'text-muted-foreground'
+            }>
+              <AmountDisplay value={bs.spent} /> / <AmountDisplay value={bs.limit} />
+            </span>
+          </div>
+          <Progress
+            value={Math.min(bs.percent, 100)}
+            className="h-1.5"
+          />
+        </div>
+      ))}
+    </CardContent>
+  </Card>
+)}
 
       {/* Últimas transações */}
       <Card>
