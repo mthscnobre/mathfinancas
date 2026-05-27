@@ -103,6 +103,7 @@ export interface Recurrence {
 
 export interface UserSettings {
   customCategories?: string[]
+  customCategoryColors?: Record<string, string>
   currency?: string
   timezone?: string
   hideValues?: boolean

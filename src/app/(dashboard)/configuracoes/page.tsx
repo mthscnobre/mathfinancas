@@ -4,20 +4,21 @@ import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCategories, DEFAULT_CATEGORIES } from '@/hooks/useCategories'
 import { CategoryBadge } from '@/components/shared/CategoryBadge'
+import { ColorPicker, gerarCorSugerida } from '@/components/shared/ColorPicker'
 import { TransactionCategory } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Plus, Trash2, Settings } from 'lucide-react'
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth()
-  const { allCategories, customCategories, addCategory, removeCategory, loading } = useCategories(user)
+  const { allCategories, customCategories, customCategoryColors, addCategory, removeCategory, loading } = useCategories(user)
   const [newCategory, setNewCategory] = useState('')
+  const [newColor, setNewColor] = useState(gerarCorSugerida())
   const [saving, setSaving] = useState(false)
 
   const handleAdd = async () => {
@@ -33,9 +34,10 @@ export default function ConfiguracoesPage() {
 
     setSaving(true)
     try {
-      await addCategory(newCategory.trim())
+      await addCategory(newCategory.trim(), newColor)
       toast.success('Categoria criada!')
       setNewCategory('')
+      setNewColor(gerarCorSugerida())
     } catch {
       toast.error('Erro ao criar categoria')
     } finally {
@@ -86,7 +88,7 @@ export default function ConfiguracoesPage() {
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {DEFAULT_CATEGORIES.map((cat) => (
-              <CategoryBadge key={cat} category={cat as TransactionCategory} />
+              <CategoryBadge key={cat} category={cat} />
             ))}
           </div>
         </CardContent>
@@ -100,10 +102,10 @@ export default function ConfiguracoesPage() {
             Suas categorias aparecem em todos os formulários do sistema
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1 space-y-1">
-              <Label>Nova categoria</Label>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nome da categoria</Label>
               <Input
                 placeholder="Ex: Pet, Viagem, Farmácia..."
                 value={newCategory}
@@ -111,12 +113,17 @@ export default function ConfiguracoesPage() {
                 onKeyDown={handleKeyDown}
               />
             </div>
-            <div className="flex items-end">
-              <Button onClick={handleAdd} disabled={saving}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar
-              </Button>
-            </div>
+
+            <ColorPicker
+              value={newColor}
+              onChange={setNewColor}
+              label="Cor da categoria"
+            />
+
+            <Button onClick={handleAdd} disabled={saving} className="w-full">
+              <Plus className="w-4 h-4 mr-2" />
+              {saving ? 'Adicionando...' : 'Adicionar categoria'}
+            </Button>
           </div>
 
           {customCategories.length === 0 ? (
@@ -130,9 +137,10 @@ export default function ConfiguracoesPage() {
                   key={cat}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                 >
-                  <Badge variant="outline" className="text-sm">
-                    {cat}
-                  </Badge>
+                  <CategoryBadge
+                    category={cat}
+                    color={customCategoryColors[cat]}
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
