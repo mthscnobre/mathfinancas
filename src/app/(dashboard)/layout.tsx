@@ -31,6 +31,7 @@ import {
   RefreshCw,
   PieChart,
   Settings,
+  Waves,
   Sun,
   Moon,
   Eye,
@@ -46,6 +47,7 @@ const navItems = [
   { href: '/metas', label: 'Metas', icon: Target },
   { href: '/patrimonio', label: 'Patrimônio', icon: Landmark },
   { href: '/orcamentos', label: 'Orçamentos', icon: PieChart },
+  { href: '/fluxo', label: 'Fluxo de Caixa', icon: Waves },
   { href: '/julius', label: 'Julius', icon: MessageCircle },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
