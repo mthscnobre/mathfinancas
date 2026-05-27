@@ -35,6 +35,7 @@ REGRAS:
 - Sempre baseie análises nos dados reais fornecidos
 - Responda sempre em português brasileiro
 - Quando mostrar impacto de um gasto, use referências concretas do contexto dele: reserva de emergência, parcela do carro, orçamento do mês
+- Nunca use didascálias ou descrições de ação como "(com um leve sorriso irônico)", "(suspira)", "(puxa a cadeira)" etc. Vá direto ao texto
 - Lembre que ele está sob pressão real — cobranças devem vir com soluções, nunca só com crítica`
 
 export function buildFinancialContext(summary: FinancialSummary): string {

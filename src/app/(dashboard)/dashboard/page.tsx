@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { TransactionDialog } from '@/components/shared/TransactionDialog'
-import { AmountDisplay, HideValuesButton } from '@/components/shared/AmountDisplay'
+import { AmountDisplay } from '@/components/shared/AmountDisplay'
 import { CategoryBadge } from '@/components/shared/CategoryBadge'
 import { PaymentMethodBadge } from '@/components/shared/PaymentMethodBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -156,9 +156,8 @@ export default function DashboardPage() {
             {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <HideValuesButton />
-          <Button onClick={() => setQuickOpen(true)}>
+<div className="flex items-center gap-2">
+  <Button onClick={() => setQuickOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Registrar despesa
           </Button>

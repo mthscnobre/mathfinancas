@@ -39,7 +39,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">MathFinanças</h1>
           <p className="text-muted-foreground text-sm">
-            Controle financeiro inteligente com Julius
+            Controle financeiro inteligente
           </p>
         </div>
 
