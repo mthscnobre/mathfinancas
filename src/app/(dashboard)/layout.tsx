@@ -170,14 +170,14 @@ export default function DashboardLayout({
   if (!user) return null
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="flex items-center gap-2 p-4 border-b">
-          <SidebarTrigger />
-        </div>
-        {children}
-      </main>
-    </SidebarProvider>
+<SidebarProvider defaultOpen={false}>
+  <AppSidebar />
+  <main className="flex-1 overflow-auto">
+    <div className="flex items-center gap-2 p-4 border-b">
+      <SidebarTrigger />
+    </div>
+    {children}
+  </main>
+</SidebarProvider>
   )
 }

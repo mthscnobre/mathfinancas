@@ -10,7 +10,7 @@ interface HideValuesStore {
 }
 
 export const useHideValues = create<HideValuesStore>((set) => ({
-  hidden: false,
+  hidden: true,
   toggle: () => set((state) => ({ hidden: !state.hidden })),
 }))
 
