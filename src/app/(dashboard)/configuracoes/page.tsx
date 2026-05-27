@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCategories, DEFAULT_CATEGORIES } from '@/hooks/useCategories'
 import { usePluggy } from '@/hooks/usePluggy'
+import { useNotifications } from '@/hooks/useNotifications'
 import { CategoryBadge } from '@/components/shared/CategoryBadge'
 import { ColorPicker, gerarCorSugerida } from '@/components/shared/ColorPicker'
 import { TransactionCategory } from '@/types'
@@ -13,7 +14,17 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { Plus, Trash2, Settings, Building2, RefreshCw, CheckCircle2, Loader2 } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Settings,
+  Building2,
+  RefreshCw,
+  CheckCircle2,
+  Loader2,
+  Bell,
+  BellOff,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import dynamic from 'next/dynamic'
@@ -27,6 +38,7 @@ export default function ConfiguracoesPage() {
   const { user } = useAuth()
   const { allCategories, customCategories, customCategoryColors, addCategory, removeCategory, loading } = useCategories(user)
   const { itemId, syncing, lastSync, connectToken, showWidget, setShowWidget, openWidget, handleSuccess, syncTransactions } = usePluggy(user)
+  const { permission, token, loading: notifLoading, requestPermission, disableNotifications } = useNotifications(user)
 
   const [newCategory, setNewCategory] = useState('')
   const [newColor, setNewColor] = useState(gerarCorSugerida())
@@ -95,7 +107,7 @@ export default function ConfiguracoesPage() {
         </div>
       </div>
 
-      {/* Open Finance */}
+      {/* Conexão Bancária */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -166,15 +178,87 @@ export default function ConfiguracoesPage() {
       {showWidget && connectToken && (
         <PluggyConnect
           connectToken={connectToken}
+          includeSandbox={true}
           onSuccess={handleSuccess}
           onClose={() => setShowWidget(false)}
           onError={(error: { message: string; data?: unknown }) => {
-  console.error('Pluggy error:', error)
-  toast.error('Erro ao conectar banco')
-  setShowWidget(false)
-}}
+            console.error('Pluggy error:', error)
+            toast.error('Erro ao conectar banco')
+            setShowWidget(false)
+          }}
         />
       )}
+
+      {/* Notificações */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Notificações Push
+          </CardTitle>
+          <CardDescription>
+            Receba alertas sobre faturas, orçamentos e lembretes financeiros
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {permission === 'granted' && token ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-emerald-500">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Notificações ativadas</span>
+              </div>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>✅ Fatura de cartão vencendo (3 dias antes)</p>
+                <p>✅ Orçamento próximo do limite (80%+)</p>
+                <p>✅ Orçamento excedido</p>
+                <p>✅ Relatório mensal do Julius (dia 1)</p>
+                <p>✅ Lembrete de contas (dia 9)</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={disableNotifications}
+                className="text-muted-foreground"
+              >
+                <BellOff className="w-4 h-4 mr-2" />
+                Desativar notificações
+              </Button>
+            </div>
+          ) : permission === 'denied' ? (
+            <div className="space-y-2">
+              <p className="text-sm text-red-500">
+                Notificações bloqueadas pelo navegador.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Para ativar, acesse as configurações do navegador e permita notificações para este site.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Ative para receber alertas sobre faturas, orçamentos excedidos e lembretes mensais.
+              </p>
+              <Button
+                onClick={requestPermission}
+                disabled={notifLoading}
+                size="sm"
+              >
+                {notifLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Ativando...
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-4 h-4 mr-2" />
+                    Ativar notificações
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Categorias padrão */}
       <Card>
