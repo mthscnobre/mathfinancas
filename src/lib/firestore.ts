@@ -213,3 +213,29 @@ export const clearJuliusHistory = async (userId: string) => {
   const batch = snap.docs.map((d) => deleteDoc(d.ref))
   await Promise.all(batch)
 }
+
+// ===== PLUGGY =====
+export const savePluggyItemId = async (userId: string, itemId: string) => {
+  // Salva na coleção do usuário
+  await setDoc(doc(db, 'users', userId, 'settings', 'pluggy'), {
+    itemId,
+    updatedAt: new Date().toISOString(),
+  })
+  // Salva mapeamento global itemId -> userId para webhooks
+  await setDoc(doc(db, 'pluggy_items', itemId), {
+    userId,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export const getPluggyItemId = async (userId: string): Promise<string | null> => {
+  const { getDoc } = await import('firebase/firestore')
+  const snap = await getDoc(doc(db, 'users', userId, 'settings', 'pluggy'))
+  return snap.exists() ? snap.data()?.itemId : null
+}
+
+export const getUserIdByItemId = async (itemId: string): Promise<string | null> => {
+  const { getDoc } = await import('firebase/firestore')
+  const snap = await getDoc(doc(db, 'pluggy_items', itemId))
+  return snap.exists() ? snap.data()?.userId : null
+}
