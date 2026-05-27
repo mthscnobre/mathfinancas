@@ -45,6 +45,11 @@ const pwaConfig = withPWA({
 const nextConfig = pwaConfig({
   reactStrictMode: true,
   turbopack: {},
+  experimental: {
+    outputFileTracingExcludes: {
+      '*': ['./functions/**/*'],
+    },
+  },
 })
 
 export default nextConfig
