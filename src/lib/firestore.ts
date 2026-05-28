@@ -10,7 +10,17 @@ import {
   limit,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import { Transaction, Goal, Recurrence, UserSettings, CreditCard, Piggybank, Investment } from '@/types'
+import {
+  Transaction,
+  Goal,
+  Recurrence,
+  UserSettings,
+  CreditCard,
+  Piggybank,
+  Investment,
+  CategoryBudget,
+  CategorizationRule,
+} from '@/types'
 
 // ===== TRANSACTIONS =====
 export const saveTransaction = async (userId: string, tx: Transaction) => {
@@ -150,8 +160,6 @@ export const subscribeInvestments = (
   })
 }
 
-import { CategoryBudget } from '@/types'
-
 // ===== BUDGETS =====
 export const saveBudget = async (userId: string, budget: CategoryBudget) => {
   await setDoc(doc(db, 'users', userId, 'budgets', budget.id), budget)
@@ -238,4 +246,37 @@ export const getUserIdByItemId = async (itemId: string): Promise<string | null> 
   const { getDoc } = await import('firebase/firestore')
   const snap = await getDoc(doc(db, 'pluggy_items', itemId))
   return snap.exists() ? snap.data()?.userId : null
+}
+
+// ===== CATEGORIZATION RULES =====
+
+export const saveRule = async (userId: string, rule: CategorizationRule) => {
+  await setDoc(doc(db, 'users', userId, 'categorizationRules', rule.id), rule)
+}
+
+export const deleteRule = async (userId: string, id: string) => {
+  await deleteDoc(doc(db, 'users', userId, 'categorizationRules', id))
+}
+
+export const subscribeRules = (
+  userId: string,
+  callback: (rules: CategorizationRule[]) => void
+) => {
+  // Ordenadas por prioridade para já chegarem no hook na ordem correta
+  const q = query(
+    collection(db, 'users', userId, 'categorizationRules'),
+    orderBy('priority', 'asc')
+  )
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => d.data() as CategorizationRule))
+  })
+}
+
+export const getRules = async (userId: string): Promise<CategorizationRule[]> => {
+  const q = query(
+    collection(db, 'users', userId, 'categorizationRules'),
+    orderBy('priority', 'asc')
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as CategorizationRule)
 }

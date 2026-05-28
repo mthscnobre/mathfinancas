@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { User } from 'firebase/auth'
-import { savePluggyItemId, getPluggyItemId } from '@/lib/firestore'
+import { savePluggyItemId, getPluggyItemId, getRules } from '@/lib/firestore'
 import { Transaction, TransactionCategory } from '@/types'
 import { saveTransaction } from '@/lib/firestore'
+import { applyRules } from '@/lib/categorization'
 import { format } from 'date-fns'
-import { v4 as uuidv4 } from 'uuid'
 
 export function usePluggy(user: User | null) {
   const [itemId, setItemId] = useState<string | null>(null)
@@ -60,11 +60,15 @@ export function usePluggy(user: User | null) {
 
       if (data.error) throw new Error(data.error)
 
+      // Busca as regras do usuário uma única vez para todo o lote
+      const rules = await getRules(user.uid)
+
       // Importa transações do banco para o Firestore
       for (const tx of data.transactions) {
         const pluggyId = `pluggy_${tx.id}`
 
-        const transaction: Transaction = {
+        // Monta a transação com a categorização padrão do Pluggy
+        const rawTransaction: Transaction = {
           id: pluggyId,
           description: tx.description || tx.descriptionRaw || 'Transação bancária',
           amount: Math.abs(tx.amount),
@@ -74,6 +78,9 @@ export function usePluggy(user: User | null) {
           paymentMethod: mapPluggyPaymentMethod(tx.paymentData?.paymentMethod),
           createdAt: new Date().toISOString(),
         }
+
+        // Aplica as regras do usuário — retorna a transação original se nenhuma bater
+        const transaction = applyRules(rawTransaction, rules)
 
         await saveTransaction(user.uid, transaction)
       }

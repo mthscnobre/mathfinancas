@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Transaction, TransactionCategory, PaymentMethod, CreditCard } from '@/types'
 import { saveTransaction } from '@/lib/firestore'
+import { useCategories } from '@/hooks/useCategories'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,11 +25,7 @@ import { toast } from 'sonner'
 import { format, addMonths } from 'date-fns'
 import { v4 as uuidv4 } from 'uuid'
 
-const CATEGORIES: TransactionCategory[] = [
-  'Alimentação', 'Transporte', 'Moradia', 'Saúde',
-  'Educação', 'Lazer', 'Assinatura', 'Vestuário',
-  'Investimento', 'Outros',
-]
+// CATEGORIES local removido — agora vem do useCategories
 
 const PAYMENT_METHODS = [
   { value: 'debit', label: 'Débito' },
@@ -68,26 +66,33 @@ export function TransactionDialog({
   onSuccess,
   defaultType = 'expense',
 }: TransactionDialogProps) {
-const [form, setForm] = useState(emptyForm(defaultType))
+  // Busca o usuário autenticado para passar ao useCategories
+  const { user } = useAuth()
+  // allCategories já inclui as categorias padrão + as customizadas do usuário
+  const { allCategories } = useCategories(user)
+
+  const [form, setForm] = useState(emptyForm(defaultType))
 
 useEffect(() => {
-  if (editingTx) {
-    setForm({
-      description: editingTx.description,
-      amount: editingTx.amount.toString(),
-      type: editingTx.type,
-      category: editingTx.category,
-      date: editingTx.date,
-      paymentMethod: editingTx.paymentMethod || 'debit',
-      creditCardId: editingTx.creditCardId || '',
-      local: editingTx.local || '',
-      notes: editingTx.notes || '',
-      installmentTotal: '',
-    })
-  } else {
-    setForm(emptyForm(defaultType))
-  }
-}, [editingTx, open])
+    if (editingTx) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm({
+        description: editingTx.description,
+        amount: editingTx.amount.toString(),
+        type: editingTx.type,
+        category: editingTx.category,
+        date: editingTx.date,
+        paymentMethod: editingTx.paymentMethod || 'debit',
+        creditCardId: editingTx.creditCardId || '',
+        local: editingTx.local || '',
+        notes: editingTx.notes || '',
+        installmentTotal: '',
+      })
+    } else {
+      setForm(emptyForm(defaultType))
+    }
+  }, [editingTx, open, defaultType])
+
   const [saving, setSaving] = useState(false)
 
   const handleOpenChange = (v: boolean) => {
@@ -246,7 +251,7 @@ useEffect(() => {
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => (
+                {allCategories.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>

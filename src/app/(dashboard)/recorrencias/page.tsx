@@ -28,12 +28,7 @@ import {
 import { toast } from 'sonner'
 import { Plus, Trash2, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
-
-const CATEGORIES: TransactionCategory[] = [
-  'Alimentação', 'Transporte', 'Moradia', 'Saúde',
-  'Educação', 'Lazer', 'Assinatura', 'Vestuário',
-  'Investimento', 'Outros',
-]
+import { useCategories } from '@/hooks/useCategories'
 
 const PAYMENT_METHODS = [
   { value: 'debit', label: 'Débito' },
@@ -57,6 +52,7 @@ const emptyForm = {
 
 export default function RecorrenciasPage() {
   const { user } = useAuth()
+  const { allCategories } = useCategories(user)
   const { recurrences, creditCards, loading } = useFinanceData(user)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -218,9 +214,9 @@ export default function RecorrenciasPage() {
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
+                    {allCategories.map((c) => (
+  <SelectItem key={c} value={c}>{c}</SelectItem>
+))}
                   </SelectContent>
                 </Select>
               </div>

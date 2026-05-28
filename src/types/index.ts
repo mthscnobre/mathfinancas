@@ -171,3 +171,36 @@ export interface FinancialSummary {
   transactions: Transaction[]
   goals: Goal[]
 }
+
+// ===== MOTOR DE REGRAS DE CATEGORIZAÇÃO =====
+
+// Campo da transação que a condição vai avaliar
+export type RuleConditionField = 'description' | 'amount' | 'paymentMethod'
+
+// Operador de comparação da condição
+export type RuleConditionOperator =
+  | 'contains'     // descrição contém "iFood"
+  | 'equals'       // campo igual a valor exato
+  | 'startsWith'   // descrição começa com "PIX"
+  | 'greaterThan'  // valor > 2000
+  | 'lessThan'     // valor < 50
+
+export interface RuleCondition {
+  field: RuleConditionField
+  operator: RuleConditionOperator
+  value: string // sempre string — para amount, converte na hora de comparar
+}
+
+export interface CategorizationRule {
+  id: string
+  name: string                        // nome amigável: "iFood → Alimentação"
+  conditions: RuleCondition[]
+  conditionLogic: 'AND' | 'OR'        // todas as condições ou qualquer uma
+  // Ações aplicadas quando a regra bate:
+  setCategory?: string                // usa string para aceitar categorias customizadas também
+  setPaymentMethod?: PaymentMethod
+  setType?: TransactionType
+  priority: number                    // ordem de aplicação — menor número = maior prioridade
+  active: boolean
+  createdAt: string
+}
